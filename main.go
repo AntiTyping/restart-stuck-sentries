@@ -34,7 +34,6 @@ func main() {
 		pods := PodsInNamespace(clientset, ns)
 
 		for _, pod := range pods {
-			//fmt.Printf(" Processing pod: %s\n", pod)
 			killHangedPods(clientset, ns, pod)
 		}
 	}
@@ -46,9 +45,7 @@ func getClientset() *kubernetes.Clientset {
 			clientcmd.NewDefaultClientConfigLoadingRules(),
 			nil,
 		).ClientConfig()
-	//println(config.Host)
 
-	// creates the clientset
 	clientset, err := kubernetes.NewForConfig(config)
 	if err != nil {
 		log.Fatal(err)
@@ -105,15 +102,12 @@ func killHangedPods(clientset *kubernetes.Clientset, namespace string, name stri
 	if err != nil {
 		log.Fatal(err)
 	}
-	str := buf.String()
 
-	var lines []string
-	sc := bufio.NewScanner(strings.NewReader(str))
+	sc := bufio.NewScanner(podLogs)
+	var last_line string
 	for sc.Scan() {
-		lines = append(lines, sc.Text())
+		last_line = sc.Text()
 	}
-
-	last_line := Strip(lines[len(lines)-1])
 
 	if strings.Contains(last_line, "SignerListener: Connected module=privval") == true {
 		fmt.Printf(" ☠️  Killing hanged pod: %s\n", name)
