@@ -34,7 +34,10 @@ func main() {
 		pods := PodsInNamespace(clientset, ns)
 
 		for _, pod := range pods {
-			killHangedPods(clientset, ns, pod)
+			_, err := killHangedPods(clientset, ns, pod)
+			if err != nil {
+				fmt.Printf(" 💥  unable to process %s\n", pod)
+			}
 		}
 	}
 }
@@ -83,24 +86,24 @@ func PodsInNamespace(clientset *kubernetes.Clientset, namespace string) []string
 	return podNames
 }
 
-func killHangedPods(clientset *kubernetes.Clientset, namespace string, name string) bool {
+func killHangedPods(clientset *kubernetes.Clientset, namespace string, name string) (bool, error) {
 	pod, err := clientset.CoreV1().Pods(namespace).Get(context.Background(), name, metav1.GetOptions{})
 	if err != nil {
-		log.Fatal(err)
+		return false, err
 	}
 
 	podLogOpts := corev1.PodLogOptions{Container: "node"}
 	req := clientset.CoreV1().Pods(pod.Namespace).GetLogs(pod.Name, &podLogOpts)
 	podLogs, err := req.Stream(context.Background())
 	if err != nil {
-		log.Fatal(err)
+		return false, err
 	}
 	defer podLogs.Close()
 
 	buf := new(bytes.Buffer)
 	_, err = io.Copy(buf, podLogs)
 	if err != nil {
-		log.Fatal(err)
+		return false, err
 	}
 
 	sc := bufio.NewScanner(podLogs)
@@ -116,11 +119,11 @@ func killHangedPods(clientset *kubernetes.Clientset, namespace string, name stri
 			Pods(namespace).
 			Delete(context.Background(), name, metav1.DeleteOptions{})
 		if err != nil {
-			log.Fatal(err)
+			return false, err
 		}
-		return true
+		return true, nil
 	} else {
 		fmt.Printf(" ✅  %s\n", name)
 	}
-	return false
+	return false, nil
 }
